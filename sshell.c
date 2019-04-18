@@ -50,21 +50,13 @@ void free_command(struct command* cmd) {
     }
 }
 
-void add_argument(char** start, int length, struct command* cmd) {
-    cmd->argv[cmd->argc] = malloc(MAX_ARG_LENGTH * sizeof(char));
-    strncpy(cmd->argv[cmd->argc], *start, length);
-    cmd->argv[cmd->argc][length] = '\0';
-    cmd->argc++;
-    *start += length;
-}
-
 char* delete_surrounding_spaces(char* str) {
     // leading spaces
     while (isspace(*str)) {
         str++;
     }
 
-    // trailing spacesj
+    // trailing spaces
     for (int i = strlen(str) - 1; i >= 0; i--) {
         if (!isspace(str[i])) {
             break;
@@ -119,8 +111,11 @@ bool parse_command(const char* input, struct command* cmd) {
                 return false; // matching end quote not found, invalid cmdline
             }
 
-            add_argument(&cmdline, pos - cmdline, cmd);
-            cmdline += 1; // skip the quote
+            cmd->argv[cmd->argc] = malloc(MAX_ARG_LENGTH * sizeof(char));
+            strncpy(cmd->argv[cmd->argc], cmdline, pos - cmdline);
+            cmd->argv[cmd->argc][pos - cmdline] = '\0';
+            cmd->argc++;
+            cmdline += pos - cmdline + 1;
             cmdline = delete_surrounding_spaces(cmdline);
         }
         else {
@@ -128,14 +123,26 @@ bool parse_command(const char* input, struct command* cmd) {
             char* pos = strpbrk(cmdline, " ><");
             if (pos == NULL) {
                 pos = end; // no remaining spaces, last argument, go to end
-                add_argument(&cmdline, pos - cmdline, cmd);
+                cmd->argv[cmd->argc] = malloc(MAX_ARG_LENGTH * sizeof(char));
+                strncpy(cmd->argv[cmd->argc], cmdline, pos - cmdline);
+                cmd->argv[cmd->argc][pos - cmdline] = '\0';
+                cmd->argc++;
+                cmdline += pos - cmdline;
             }
             else if (*pos == ' ') {
-                add_argument(&cmdline, pos - cmdline, cmd);
+                cmd->argv[cmd->argc] = malloc(MAX_ARG_LENGTH * sizeof(char));
+                strncpy(cmd->argv[cmd->argc], cmdline, pos - cmdline);
+                cmd->argv[cmd->argc][pos - cmdline] = '\0';
+                cmd->argc++;
+                cmdline += pos - cmdline;
             }
             else if (*pos == '<') {
                 if (pos - cmdline > 0) {
-                    add_argument(&cmdline, pos - cmdline, cmd);
+                    cmd->argv[cmd->argc] = malloc(MAX_ARG_LENGTH * sizeof(char));
+                    strncpy(cmd->argv[cmd->argc], cmdline, pos - cmdline);
+                    cmd->argv[cmd->argc][pos - cmdline] = '\0';
+                    cmd->argc++;
+                    cmdline += pos - cmdline;
                 }
                 cmdline += 1; // skip the <
                 cmdline = delete_surrounding_spaces(cmdline);
@@ -158,7 +165,11 @@ bool parse_command(const char* input, struct command* cmd) {
             }
             else if (*pos == '>') {
                 if (pos - cmdline > 0) {
-                    add_argument(&cmdline, pos - cmdline, cmd);
+                    cmd->argv[cmd->argc] = malloc(MAX_ARG_LENGTH * sizeof(char));
+                    strncpy(cmd->argv[cmd->argc], cmdline, pos - cmdline);
+                    cmd->argv[cmd->argc][pos - cmdline] = '\0';
+                    cmd->argc++;
+                    cmdline += pos - cmdline;
                 }
                 cmdline += 1; // skip the >
                 cmdline = delete_surrounding_spaces(cmdline);
