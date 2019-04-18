@@ -81,6 +81,7 @@ bool parse_command(const char* input, struct command* cmd) {
     char* cmdline = buffer;
     strcpy(cmdline, input);
 
+    // delete the spaces around the command line to prevent code below getting confused
     cmdline = delete_surrounding_spaces(cmdline);
     if (strlen(cmdline) == 0) {
         return true;
