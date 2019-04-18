@@ -300,7 +300,7 @@ int main() {
                 fclose(fd);
             }
 
-            printf("+ completed '%s' [0]\n", input);
+            fprintf(stderr, "+ completed '%s' [0]\n", input);
         }
         else if (strcmp(cmd.argv[0], "cd") == 0) {
             // check to make sure that the directory even exists
@@ -323,7 +323,7 @@ int main() {
                 continue;
             }
 
-            printf("+ completed '%s %s' [0]\n", cmd.argv[0], cmd.argv[1]);
+            fprintf(stderr, "+ completed '%s %s' [0]\n", cmd.argv[0], cmd.argv[1]);
         }
         else {
             // user entered command is not a builtin, fork and run the program
