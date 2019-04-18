@@ -305,11 +305,6 @@ int main() {
 
             printf("+ completed '%s %s' [0]\n", cmd.argv[0], cmd.argv[1]);
         }
-        // for testing only, remove before submitting
-        else if (strcmp(cmd.argv[0], "reload") == 0) {
-            char* argv[] = {"sshell", NULL};
-            execvp("sshell", argv);
-        }
         else {
             // user entered command is not a builtin, fork and run the program
             pid_t pid = fork();
