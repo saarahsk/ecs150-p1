@@ -324,6 +324,7 @@ int main() {
                         return 1;
                     }
 
+                    // replace file descriptor for stdout for the child
                     dup2(fileno(fd), fileno(stdout));
                     fclose(fd);
                 }
@@ -335,6 +336,7 @@ int main() {
                         return 1;
                     }
 
+                    // replace file descriptor for stdin for the child
                     dup2(fileno(fd), fileno(stdin));
                     fclose(fd);
                 }
