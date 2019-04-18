@@ -184,16 +184,34 @@ bool parse_command(const char* input, struct command* cmd) {
 }
 
 int main() {
+    char buffer[MAX_LENGTH];
     while (true) {
+
+        char *n1;
         printf("sshell$ ");
+        fflush(stdout);
 
-        size_t buffer_size = MAX_LENGTH + 1; // 1 for null character
-        char buffer[buffer_size];
-        memset(buffer, 0, buffer_size);
+        // size_t buffer_size = MAX_LENGTH + 1; // 1 for null character
+        // char buffer[buffer_size];
+        // memset(buffer, 0, buffer_size);
 
-        char* buf = buffer;
-        int chars = getline(&buf, &buffer_size, stdin);
-        buffer[chars - 1] = '\0';
+        // char* buf = buffer;
+
+        // fgets(&buf, MAX_LENGTH, stdin)
+        // int chars = getline(&buf, &buffer_size, stdin);
+
+        fgets(buffer, MAX_LENGTH, stdin);
+
+        if (!isatty(STDIN_FILENO)) {
+          printf("%s", buffer);
+          fflush(stdout);
+        }
+
+        n1 = strchr(buffer, '\n');
+        if(n1)
+          *n1 = '\0';
+
+
 
         if (strlen(buffer) == 0) {
             continue;
