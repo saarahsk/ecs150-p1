@@ -1,8 +1,8 @@
-all: sshell.o
-	gcc -g -o sshell sshell.o
+output: sshell.o
+	gcc -o sshell -Wall -Wimplicit-function-declaration -Wint-conversion -Wincompatible-pointer-types -Werror -Wno-deprecated sshell.o
 
 sshell.o: sshell.c
-	gcc -Wall -Werror -Wimplicit-function-declaration -Wint-conversion -Wincompatible-pointer-types -Wno-deprecated -g -c -o sshell.o sshell.c
+	gcc -c sshell.c
 
 clean:
-	rm -rf *.o *.dSYM sshell
+	rm sshell *.o
