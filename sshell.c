@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <ctype.h>
+#include <errno.h>
 
 // the maximum length of a command line never exceeds 512 characters.
 #define MAX_LENGTH 512
@@ -57,7 +58,7 @@ void add_argument(char** start, int length, struct command* cmd) {
     *start += length;
 }
 
-char* trim(char* str) {
+char* delete_surrounding_spaces(char* str) {
     // leading spaces
     while (isspace(*str)) {
         str++;
@@ -80,7 +81,7 @@ bool parse_command(const char* input, struct command* cmd) {
     char* cmdline = buffer;
     strcpy(cmdline, input);
 
-    cmdline = trim(cmdline);
+    cmdline = delete_surrounding_spaces(cmdline);
     if (strlen(cmdline) == 0) {
         return true;
     }
@@ -89,7 +90,7 @@ bool parse_command(const char* input, struct command* cmd) {
     if (cmdline[strlen(cmdline) - 1] == '&') {
         cmdline[strlen(cmdline) - 1] = '\0';
         cmd->background = true;
-        cmdline = trim(cmdline);
+        cmdline = delete_surrounding_spaces(cmdline);
     }
 
     // ensure the background job specifier isn't in the middle somewhere
@@ -119,7 +120,7 @@ bool parse_command(const char* input, struct command* cmd) {
 
             add_argument(&cmdline, pos - cmdline, cmd);
             cmdline += 1; // skip the quote
-            cmdline = trim(cmdline);
+            cmdline = delete_surrounding_spaces(cmdline);
         }
         else {
             // in a regular argument, skip until the next control character
@@ -136,7 +137,7 @@ bool parse_command(const char* input, struct command* cmd) {
                     add_argument(&cmdline, pos - cmdline, cmd);
                 }
                 cmdline += 1; // skip the <
-                cmdline = trim(cmdline);
+                cmdline = delete_surrounding_spaces(cmdline);
 
                 // get filename
                 pos = strpbrk(cmdline, " >");
@@ -159,7 +160,7 @@ bool parse_command(const char* input, struct command* cmd) {
                     add_argument(&cmdline, pos - cmdline, cmd);
                 }
                 cmdline += 1; // skip the >
-                cmdline = trim(cmdline);
+                cmdline = delete_surrounding_spaces(cmdline);
 
                 // get filename
                 pos = strpbrk(cmdline, " <");
@@ -183,35 +184,49 @@ bool parse_command(const char* input, struct command* cmd) {
     return true;
 }
 
-int main() {
-    char buffer[MAX_LENGTH];
+void check_children_complete(int* active_jobs) {
+    // get the status of any completed children
     while (true) {
+        int status = 0;
+        pid_t pid = waitpid(-1, &status, WNOHANG);
 
-        char *n1;
-        printf("sshell$ ");
-        fflush(stdout);
+        if (pid == -1) {
+            if (errno == ECHILD) {
+                // no more child processes
+                return;
+            }
 
-        // size_t buffer_size = MAX_LENGTH + 1; // 1 for null character
-        // char buffer[buffer_size];
-        // memset(buffer, 0, buffer_size);
-
-        // char* buf = buffer;
-
-        // fgets(&buf, MAX_LENGTH, stdin)
-        // int chars = getline(&buf, &buffer_size, stdin);
-
-        fgets(buffer, MAX_LENGTH, stdin);
-
-        if (!isatty(STDIN_FILENO)) {
-          printf("%s", buffer);
-          fflush(stdout);
+            perror("waitpid");
+            return;
         }
 
-        n1 = strchr(buffer, '\n');
-        if(n1)
-          *n1 = '\0';
+        if (pid == 0) {
+            // no children are complete yet
+            break;
+        }
 
+        fprintf(stderr, "+ completed '?' [%d]\n", WEXITSTATUS(status));
+        *active_jobs -= 1;
+    }
+}
 
+int main() {
+    int active_jobs = 0;
+
+    while (true) {
+        if (active_jobs > 0) {
+            check_children_complete(&active_jobs);
+        }
+
+        printf("sshell$ ");
+
+        size_t buffer_size = MAX_LENGTH + 1; // 1 for null character
+        char buffer[buffer_size];
+        memset(buffer, 0, buffer_size);
+
+        char* buf = buffer;
+        int chars = getline(&buf, &buffer_size, stdin);
+        buffer[chars - 1] = '\0';
 
         if (strlen(buffer) == 0) {
             continue;
@@ -232,16 +247,23 @@ int main() {
 
         // handle built in commands
         if (strcmp(cmd.argv[0], "exit") == 0) {
+            if (active_jobs > 0) {
+                fprintf(stderr, "Error: active jobs still running\n");
+                continue;
+            }
+
             fprintf(stderr, "Bye...\n");
-            exit(0);
+            return 0;
         }
         else if (strcmp(cmd.argv[0], "pwd") == 0) {
+            // use getcwd to get the current working directory
             char cwd[MAX_LENGTH];
             if (getcwd(cwd, MAX_LENGTH) == NULL) {
                 perror("pwd");
-                exit(1);
+                return 1;
             }
 
+            // special redirection since we aren't actually forking so have to fake it
             FILE* fd = stdout;
             if (cmd.output != NULL) {
                 fd = fopen(cmd.output, "w");
@@ -253,6 +275,7 @@ int main() {
 
             fprintf(fd, "%s\n", cwd);
             if (cmd.output != NULL) {
+                // we don't want to accidentally close stdout of the main shell
                 fclose(fd);
             }
 
@@ -272,6 +295,7 @@ int main() {
                 continue;
             }
 
+            // chdir changes the working directory of the process
             int ret = chdir(cmd.argv[1]);
             if (ret == -1) {
                 perror("cd");
@@ -280,19 +304,24 @@ int main() {
 
             printf("+ completed '%s %s' [0]\n", cmd.argv[0], cmd.argv[1]);
         }
+        // for testing only, remove before submitting
+        else if (strcmp(cmd.argv[0], "reload") == 0) {
+            char* argv[] = {"sshell", NULL};
+            execvp("sshell", argv);
+        }
         else {
-            // user entry is not a builtin, fork and run the program
+            // user entered command is not a builtin, fork and run the program
             pid_t pid = fork();
             if (pid == -1) {
                 perror("fork");
-                exit(1);
+                return 1;
             }
             else if (pid == 0) {
                 if (cmd.output != NULL) {
                     FILE* fd = fopen(cmd.output, "w");
                     if (fd == NULL) {
                         fprintf(stderr, "Error: cannot open output file\n");
-                        exit(1);
+                        return 1;
                     }
 
                     dup2(fileno(fd), fileno(stdout));
@@ -303,7 +332,7 @@ int main() {
                     FILE* fd = fopen(cmd.input, "r");
                     if (fd == NULL) {
                         fprintf(stderr, "Error: cannot open input file\n");
-                        exit(1);
+                        return 1;
                     }
 
                     dup2(fileno(fd), fileno(stdin));
@@ -312,17 +341,22 @@ int main() {
 
                 execvp(cmd.argv[0], cmd.argv);
                 fprintf(stderr, "Error: command not found\n");
-                exit(1);
+                return 1;
             }
             else {
-                int status = 0;
-                int ret = waitpid(pid, &status, 0);
-                if (ret == -1) {
-                    perror("waitpid");
-                    exit(1);
-                }
+                active_jobs++;
 
-                fprintf(stderr, "+ completed '%s' [%d]\n", buffer, WEXITSTATUS(status));
+                if (!cmd.background) {
+                    int status = 0;
+                    int ret = waitpid(pid, &status, 0);
+                    if (ret == -1) {
+                        perror("waitpid");
+                        return 1;
+                    }
+
+                    fprintf(stderr, "+ completed '%s' [%d]\n", buffer, WEXITSTATUS(status));
+                    active_jobs--;
+                }
             }
         }
 
