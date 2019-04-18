@@ -33,3 +33,8 @@ a bit.
 
 We tested mostly manually by trying to run different commands with the shell.
 We weren't able to get the test script working unfortunately.
+
+We used a lot of resources to finish this program. The main resources were from
+stack overflow which explained how to use a lot of the system calls we made.
+We also used the lecture slides a lot to reference the sample code that was
+provided in them.
