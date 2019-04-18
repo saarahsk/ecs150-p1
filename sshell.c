@@ -214,29 +214,38 @@ void check_children_complete(int* active_jobs) {
 int main() {
     int active_jobs = 0;
 
+    char input[MAX_LENGTH];
     while (true) {
         if (active_jobs > 0) {
             check_children_complete(&active_jobs);
         }
 
+        char *n1;
+
         printf("sshell$ ");
+        fflush(stdout);
 
-        size_t buffer_size = MAX_LENGTH + 1; // 1 for null character
-        char buffer[buffer_size];
-        memset(buffer, 0, buffer_size);
+        fgets(input, MAX_LENGTH, stdin);
+        
+        if (!isatty(STDIN_FILENO)) {
+            printf("%s", input);
+            fflush(stdout);
+        }
 
-        char* buf = buffer;
-        int chars = getline(&buf, &buffer_size, stdin);
-        buffer[chars - 1] = '\0';
+        n1 = strchr(input, '\n');
 
-        if (strlen(buffer) == 0) {
+        if(n1){
+          *n1 = '\0';
+        }
+
+        if (strlen(input) == 0) {
             continue;
         }
 
         struct command cmd;
         init_command(&cmd);
 
-        bool success = parse_command(buffer, &cmd);
+        bool success = parse_command(input, &cmd);
         if (!success) {
             continue;
         }
@@ -280,7 +289,7 @@ int main() {
                 fclose(fd);
             }
 
-            printf("+ completed '%s' [0]\n", buffer);
+            printf("+ completed '%s' [0]\n", input);
         }
         else if (strcmp(cmd.argv[0], "cd") == 0) {
             // check to make sure that the directory even exists
@@ -357,7 +366,7 @@ int main() {
                         return 1;
                     }
 
-                    fprintf(stderr, "+ completed '%s' [%d]\n", buffer, WEXITSTATUS(status));
+                    fprintf(stderr, "+ completed '%s' [%d]\n", input, WEXITSTATUS(status));
                     active_jobs--;
                 }
             }
